@@ -1,0 +1,5 @@
+v1.0 Codigo
+		Funciona en este momento todo, tanto el envio de notas,
+		la activación..
+		Hay una opción dentro de la funcion ligado para el control	
+		del ligado de las notas && o ||, estudiar para mejora.
