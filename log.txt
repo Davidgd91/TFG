@@ -19,3 +19,7 @@ v3.0 Codigo 09/11/2017
 		Incluidos los modulos:
 		- Modo Fret / Fretless --> Switch en pin digital X
 		- Modo Bass / Guit     --> Switch en pin digital X
+
+
+v4.0 Codigo 12/11/2017
+		Comprobado el funcionamiento de los modulos

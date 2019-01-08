@@ -15,31 +15,30 @@
 /*****************************************************************************/
 /*                               DEFINES                                     */
 /*****************************************************************************/
-#define S0        A0
-#define S1        A1
-#define S2        A2
+#define S0        A10
+#define S1        A9
+#define S2        A8
 
-#define T0        A3
-#define T1        A4
-#define T2        7
+#define T0        A11
+#define T1        A12
+#define T2        A13
 
-#define POT_STR   A5
-#define LED_EL    2 
-#define LED_A     3
-#define LED_D     4
-#define LED_G     5
-#define LED_B     6
-#define LED_EH    8
+#define POT_STR   A6
+#define LED_EL    53 
+#define LED_A     51
+#define LED_D     49
+#define LED_G     47
+#define LED_B     45
+#define LED_EH    43
 
-#define GUIT_R    11
-#define GUIT_V    10
-#define GUIT_A    9
+#define GUIT_R    2
+#define GUIT_V    3
+#define GUIT_A    4
 
-#define SW_LIGADO     12
-#define SW_VEL        14
-#define SW_TRASTE     15
-#define SW_BASS_GUIT  13
-
+#define SW_LIGADO     37
+#define SW_VEL        35
+#define SW_TRASTE     33
+#define SW_BASS_GUIT  31
 
 #define N_STR     3
 #define N_FRET    13
@@ -132,7 +131,7 @@ unsigned char guit_onof[] = {GUIT_R,GUIT_V,GUIT_A}; // Activada el modo guitarra
 unsigned char  cuerdas=EAD;    // cuerda en la que se encuentra, por defecto EAD
 
 bool bass_guit=true;   // Cambia de modo de guitarra a bajo
-bool traste=true;     // Cambia de modo de funcionamiento definido por trastes o no
+bool fretless=true;     // Cambia de modo de funcionamiento de fret o fretless
 bool ligado=true;    // Cambia de modo ligado de notas a modo no ligado
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
                    // ya sea por la fuerza del sensor o mediante un pot
@@ -165,7 +164,7 @@ void loop() {
 
   readControls();
   determinaTraste();
-  //imprimir();
+ // imprimir();
   if(ligado) 
     ligadoNotas();
   rutinaEnvio();
@@ -186,7 +185,13 @@ void imprimir()
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
      // Serial.println("NOTA "+String(i)+" = "+String(S_active[i]));
+  //Serial.println("NOTA1 "+String(ligado1));
      // Serial.println("\n"); 
+    Serial.println("LIGADO "+String(ligado));
+  Serial.println("vel_Midi "+String(vel_Midi));
+  Serial.println("fretless "+String(fretless));
+  Serial.println("bass_guit "+String(bass_guit));
+  Serial.println("\n"); 
 }
 
 /*****************************************************************************/
@@ -202,8 +207,10 @@ void imprimir()
 void readControls(){
   ligado      = digitalRead(SW_LIGADO);
   vel_Midi    = digitalRead(SW_VEL);
-  //traste      = digitalRead(SW_TRASTE);
+  fretless    = digitalRead(SW_TRASTE);
   bass_guit   = digitalRead(SW_BASS_GUIT);
+  ligado      = digitalRead(SW_LIGADO);
+
   cuerdas     = estadoCuerdas();
   for (int i=0; i<N_STR; i++)
   {
@@ -229,7 +236,7 @@ bool comprobarPulsado(int i, bool velMidi)
   //short potVel=0;
   short valorFSR = analogRead(T_pins[i]);
   if(velMidi)
-    T_value[i] = map (valorFSR, 0, 800, 60, 127);//mapeo los valores leido por el FSR
+    T_value[i] = map (valorFSR, 0, 980, 60, 127);//mapeo los valores leido por el FSR
   else
   {
     // Aqui se simula la lectura del potenciometro
@@ -238,7 +245,7 @@ bool comprobarPulsado(int i, bool velMidi)
     T_value[i]=127;
   }
 
-  if((valorFSR>15) && (valorFSR<950) || !traste)
+  if((valorFSR>15) && (valorFSR<950) || !fretless)
     activo=true;
 
   return activo;
@@ -283,7 +290,7 @@ unsigned char estadoCuerdas()
   pos = map (potCuerda, 0, 1023, 0, 3);
   // HAY QUE INCLUIR LA SECUENCIA PARA EL BAJO
   // Y TENER EL RGB PARA BAJO, GUITARRA Y FRETLESS
-  if(bass_guit)
+  if(fretless)
   {
     analogWrite(guit_onof[0], 255);  // Color VERDE
     analogWrite(guit_onof[1], 0);  
@@ -457,7 +464,7 @@ void rutinaEnvio()
 unsigned char determinaNota(int i)
 {
   unsigned char nota=0;
-  if(traste)
+  if(fretless)
   {
     if(bass_guit)
     {
@@ -497,7 +504,7 @@ unsigned char determinaNota(int i)
     if (!S_vals[i])
       nota=16;
     else
-      nota = 116 - (S_vals[i]/10);
+      nota = 123 - (S_vals[i]/10);
   }
   return nota;
 }
