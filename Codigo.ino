@@ -31,8 +31,14 @@
 #define LED_B     6
 #define LED_EH    8
 
-#define SW_LIGADO 12
-#define SW_VEL    13
+#define GUIT_R    11
+#define GUIT_V    10
+#define GUIT_A    9
+
+#define SW_LIGADO     12
+#define SW_VEL        14
+#define SW_TRASTE     15
+#define SW_BASS_GUIT  13
 
 
 #define N_STR     3
@@ -67,6 +73,11 @@
 #define NOTA_B      60
 #define NOTA_E_HIGH 65
 
+#define BASS_E 28
+#define BASS_A 33
+#define BASS_D 38
+#define BASS_G 43
+
 
 /*****************************************************************************/
 /*                         PROTOTIPO DE FUNCIONES                            */
@@ -87,11 +98,15 @@ unsigned short valorCuerda(int i);
 /*****************************************************************************/
 /*                          PARAMETROS GLOBALES                              */
 /*****************************************************************************/
-// Definicion de las notas al aire de cada una de la configuracion de cuerdas
-unsigned char notas_default[N_STR] = {NOTA_E_LOW, NOTA_A, NOTA_D};
-unsigned char notas_1_down[N_STR]  = {NOTA_A,     NOTA_D, NOTA_G};
-unsigned char notas_2_down[N_STR]  = {NOTA_D,     NOTA_G, NOTA_B};
-unsigned char notas_3_down[N_STR]  = {NOTA_G,     NOTA_B, NOTA_E_HIGH};
+// Definicion de las notas al aire en la guitarra
+unsigned char guit_default[N_STR] = {NOTA_E_LOW, NOTA_A, NOTA_D};
+unsigned char guit_1_down[N_STR]  = {NOTA_A,     NOTA_D, NOTA_G};
+unsigned char guit_2_down[N_STR]  = {NOTA_D,     NOTA_G, NOTA_B};
+unsigned char guit_3_down[N_STR]  = {NOTA_G,     NOTA_B, NOTA_E_HIGH};
+// Definicion de las notas al aire en el bajo
+unsigned char bass_default[N_STR] = {BASS_E, BASS_A, BASS_D};
+unsigned char bass_1_down[N_STR]  = {BASS_A, BASS_D, BASS_G};
+
 
 unsigned short valorString[N_FRET+2] = {
     FRET0,FRET1,FRET2,FRET3,FRET4,FRET5,FRET6,
@@ -110,13 +125,17 @@ unsigned char  E_notaVieja[N_STR] = {0,0,0}; // Almacena el valor antiguo de la 
 
 unsigned char fretTouched[N_STR] = {0,0,0};
 
-unsigned char led_STR[] = {LED_EL,LED_A,LED_D, // Pines de salida para los leds que indican
+unsigned char led_GUIT[] = {LED_EL,LED_A,LED_D, // Pines de salida para los leds que indican
                           LED_G,LED_B,LED_EH}; // que cuerdas estan activas
+unsigned char guit_onof[] = {GUIT_R,GUIT_V,GUIT_A}; // Activada el modo guitarra
+                                                   
 unsigned char  cuerdas=EAD;    // cuerda en la que se encuentra, por defecto EAD
 
-bool ligado=true;   // Cambia de modo ligado de notas a modo no ligado
+bool bass_guit=true;   // Cambia de modo de guitarra a bajo
+bool traste=true;     // Cambia de modo de funcionamiento definido por trastes o no
+bool ligado=true;    // Cambia de modo ligado de notas a modo no ligado
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
-                    // ya sea por la fuerza del sensor o mediante un pot
+                   // ya sea por la fuerza del sensor o mediante un pot
 
 void setup() 
 {
@@ -124,11 +143,16 @@ void setup()
   Serial.begin(115200);
 
   pinMode(SW_LIGADO, INPUT);
+  pinMode(SW_BASS_GUIT, INPUT);
   pinMode(SW_VEL, INPUT);
+  pinMode(SW_TRASTE, INPUT);
   pinMode(POT_STR,INPUT);
     
   for(int i=0; i< 6; i++)
-    pinMode(led_STR[i],OUTPUT);
+    pinMode(led_GUIT[i],OUTPUT);
+  for(int i=0; i< 2; i++)
+    pinMode(guit_onof[i],OUTPUT);
+  
 
   for(int i=0; i<N_STR; i++)
   {
@@ -176,9 +200,11 @@ void imprimir()
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
-  ligado   = digitalRead(SW_LIGADO);
-  vel_Midi = digitalRead(SW_VEL);
-  cuerdas  = estadoCuerdas();
+  ligado      = digitalRead(SW_LIGADO);
+  vel_Midi    = digitalRead(SW_VEL);
+  //traste      = digitalRead(SW_TRASTE);
+  bass_guit   = digitalRead(SW_BASS_GUIT);
+  cuerdas     = estadoCuerdas();
   for (int i=0; i<N_STR; i++)
   {
     T_activeNew[i] = comprobarPulsado(i,vel_Midi);
@@ -203,7 +229,7 @@ bool comprobarPulsado(int i, bool velMidi)
   //short potVel=0;
   short valorFSR = analogRead(T_pins[i]);
   if(velMidi)
-    T_value[i] = map (valorFSR, 0, 980, 60, 127);//mapeo los valores leido por el FSR
+    T_value[i] = map (valorFSR, 0, 800, 60, 127);//mapeo los valores leido por el FSR
   else
   {
     // Aqui se simula la lectura del potenciometro
@@ -212,7 +238,7 @@ bool comprobarPulsado(int i, bool velMidi)
     T_value[i]=127;
   }
 
-  if((valorFSR>15) && (valorFSR<950))
+  if((valorFSR>15) && (valorFSR<950) || !traste)
     activo=true;
 
   return activo;
@@ -255,50 +281,66 @@ unsigned char estadoCuerdas()
   unsigned char  pos=0;
   potCuerda = analogRead(POT_STR);
   pos = map (potCuerda, 0, 1023, 0, 3);
-  switch (pos)
+  // HAY QUE INCLUIR LA SECUENCIA PARA EL BAJO
+  // Y TENER EL RGB PARA BAJO, GUITARRA Y FRETLESS
+  if(bass_guit)
   {
-    case EAD:
-      digitalWrite(led_STR[0], HIGH);
-      digitalWrite(led_STR[1], HIGH);
-      digitalWrite(led_STR[2], HIGH);
-      digitalWrite(led_STR[3], LOW);
-      digitalWrite(led_STR[4], LOW);
-      digitalWrite(led_STR[5], LOW);
+    analogWrite(guit_onof[0], 255);  // Color VERDE
+    analogWrite(guit_onof[1], 0);  
+    analogWrite(guit_onof[2], 255);  
 
-    break;
-    case ADG:
-      digitalWrite(led_STR[0], LOW);
-      digitalWrite(led_STR[1], HIGH);
-      digitalWrite(led_STR[2], HIGH);
-      digitalWrite(led_STR[3], HIGH);
-      digitalWrite(led_STR[4], LOW);
-      digitalWrite(led_STR[5], LOW);
-    break;
-    case DGB:
-      digitalWrite(led_STR[0], LOW);
-      digitalWrite(led_STR[1], LOW);
-      digitalWrite(led_STR[2], HIGH);
-      digitalWrite(led_STR[3], HIGH);
-      digitalWrite(led_STR[4], HIGH);
-      digitalWrite(led_STR[5], LOW);
-    break;
-    case GBE:
-      digitalWrite(led_STR[0], LOW);
-      digitalWrite(led_STR[1], LOW);
-      digitalWrite(led_STR[2], LOW);
-      digitalWrite(led_STR[3], HIGH);
-      digitalWrite(led_STR[4], HIGH);
-      digitalWrite(led_STR[5], HIGH);
-    break;
-    default:
-      digitalWrite(led_STR[0], LOW);
-      digitalWrite(led_STR[1], LOW);
-      digitalWrite(led_STR[2], LOW);
-      digitalWrite(led_STR[3], LOW);
-      digitalWrite(led_STR[4], LOW);
-      digitalWrite(led_STR[5], LOW);
-    break;
+    switch (pos)
+    {
+      case EAD:
+        digitalWrite(led_GUIT[0], HIGH);
+        digitalWrite(led_GUIT[1], HIGH);
+        digitalWrite(led_GUIT[2], HIGH);
+        digitalWrite(led_GUIT[3], LOW);
+        digitalWrite(led_GUIT[4], LOW);
+        digitalWrite(led_GUIT[5], LOW);
+
+      break;
+      case ADG:
+        digitalWrite(led_GUIT[0], LOW);
+        digitalWrite(led_GUIT[1], HIGH);
+        digitalWrite(led_GUIT[2], HIGH);
+        digitalWrite(led_GUIT[3], HIGH);
+        digitalWrite(led_GUIT[4], LOW);
+        digitalWrite(led_GUIT[5], LOW);
+      break;
+      case DGB:
+        digitalWrite(led_GUIT[0], LOW);
+        digitalWrite(led_GUIT[1], LOW);
+        digitalWrite(led_GUIT[2], HIGH);
+        digitalWrite(led_GUIT[3], HIGH);
+        digitalWrite(led_GUIT[4], HIGH);
+        digitalWrite(led_GUIT[5], LOW);
+      break;
+      case GBE:
+        digitalWrite(led_GUIT[0], LOW);
+        digitalWrite(led_GUIT[1], LOW);
+        digitalWrite(led_GUIT[2], LOW);
+        digitalWrite(led_GUIT[3], HIGH);
+        digitalWrite(led_GUIT[4], HIGH);
+        digitalWrite(led_GUIT[5], HIGH);
+      break;
+    }
   }
+  else
+  {
+    analogWrite(guit_onof[0], 0);  // Color ROJO
+    analogWrite(guit_onof[1], 255);    
+    analogWrite(guit_onof[2], 255);  
+
+    digitalWrite(led_GUIT[0], LOW);
+    digitalWrite(led_GUIT[1], LOW);
+    digitalWrite(led_GUIT[2], LOW);
+    digitalWrite(led_GUIT[3], LOW);
+    digitalWrite(led_GUIT[4], LOW);
+    digitalWrite(led_GUIT[5], LOW);
+
+  }
+
   return pos;
 }
 
@@ -415,20 +457,47 @@ void rutinaEnvio()
 unsigned char determinaNota(int i)
 {
   unsigned char nota=0;
-  switch (cuerdas)
+  if(traste)
   {
-    case EAD:
-      nota = notas_default[i] + fretTouched[i];
-    break;
-    case ADG:
-      nota = notas_1_down[i] + fretTouched[i];
-    break;
-    case DGB:
-      nota = notas_2_down[i] + fretTouched[i];
-    break;
-    case GBE:
-      nota = notas_3_down[i] + fretTouched[i];
-    break;
+    if(bass_guit)
+    {
+      switch (cuerdas)
+      {
+        case EAD:
+          nota = guit_default[i] + fretTouched[i];
+        break;
+        case ADG:
+          nota = guit_1_down[i] + fretTouched[i];
+        break;
+        case DGB:
+          nota = guit_2_down[i] + fretTouched[i];
+        break;
+        case GBE:
+          nota = guit_3_down[i] + fretTouched[i];
+        break;
+      }
+    }
+    else
+    {
+      switch (cuerdas)
+      {
+        case EAD:
+          nota = bass_default[i] + fretTouched[i];
+        break;
+        case ADG:
+        case DGB:
+        case GBE:
+          nota = bass_1_down[i] + fretTouched[i];
+        break;
+      }
+    }
+  }
+  else
+  {
+    if (!S_vals[i])
+      nota=16;
+    else
+      nota = 116 - (S_vals[i]/10);
   }
   return nota;
 }
