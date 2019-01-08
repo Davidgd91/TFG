@@ -9,3 +9,8 @@ v2.0 Codigo 07/11/2017
 		Incluidos los modulos de:
 		- Ligado nota/ no ligado   --> Switch en pin digital X
 		- Velocidad midi pot / FSR --> Switch en pin digital X
+
+v3.0 Codigo 08/11/2017
+		Incluidos los modulos:
+		- Leer el valor del pot para cambiar las cuerdas
+		- Mostrar en los leds el orden de las cuerdas

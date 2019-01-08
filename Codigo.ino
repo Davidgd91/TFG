@@ -10,8 +10,6 @@
 /*****************************************************************************/
 /*                          MODULOS IMPORTADOS                               */
 /*****************************************************************************/
-#include <EEPROM.h>
-#include <Wire.h>
 
 
 /*****************************************************************************/
@@ -23,15 +21,28 @@
 
 #define T0        A3
 #define T1        A4
-#define T2        A5
+#define T2        7
 
-#define SW_LIGADO 2
-#define SW_VEL    3
+#define POT_STR   A5
+#define LED_EL    2 
+#define LED_A     3
+#define LED_D     4
+#define LED_G     5
+#define LED_B     6
+#define LED_EH    8
+
+#define SW_LIGADO 12
+#define SW_VEL    13
 
 
 #define N_STR     3
 #define N_FRET    13
 #define N_KEYS    13
+
+#define EAD       0
+#define ADG       1
+#define DGB       2
+#define GBE       3
 
 #define FRET0     0
 #define FRET1     830
@@ -49,13 +60,19 @@
 #define FRET13    10
 #define FRETFN    5
 
+#define NOTA_E_LOW  40
+#define NOTA_A      45
+#define NOTA_D      50
+#define NOTA_G      55
+#define NOTA_B      60
+#define NOTA_E_HIGH 65
+
 
 /*****************************************************************************/
 /*                         PROTOTIPO DE FUNCIONES                            */
 /*****************************************************************************/
 void imprimir();
 void readControls();
-unsigned short valorCuerda(int i);
 bool comprobarPulsado(int i);
 void determinaTraste ();
 void ligadoNotas();
@@ -63,20 +80,18 @@ void rutinaEnvio();
 void noteOn(int pitch, int velocity);
 void noteOff(int pitch);
 void cortarNota();
-
+unsigned char estadoCuerdas();
+unsigned char determinaNota(int i);
+unsigned short valorCuerda(int i);
 
 /*****************************************************************************/
 /*                          PARAMETROS GLOBALES                              */
 /*****************************************************************************/
-unsigned char fretDefs[N_STR][N_FRET+1] = {
-    {40,41,42,43,44,45,46,47,48,49,50,51,52,53}, // Cuerda E
-    {45,46,47,48,49,50,51,52,53,54,55,56,57,58}, // Cuerda A
-    {50,51,52,53,54,55,56,57,58,59,60,61,62,63}, // Cuerda D
-};  /* Defincion de las notas midi asignada a cada traste
-       3 cuerdas y 16 trastes, siendo la tercera cuerda E
-       la segunda A y la primera D */
-
-unsigned char notas_default[N_STR]  = {40, 45, 50};
+// Definicion de las notas al aire de cada una de la configuracion de cuerdas
+unsigned char notas_default[N_STR] = {NOTA_E_LOW, NOTA_A, NOTA_D};
+unsigned char notas_1_down[N_STR]  = {NOTA_A,     NOTA_D, NOTA_G};
+unsigned char notas_2_down[N_STR]  = {NOTA_D,     NOTA_G, NOTA_B};
+unsigned char notas_3_down[N_STR]  = {NOTA_G,     NOTA_B, NOTA_E_HIGH};
 
 unsigned short valorString[N_FRET+2] = {
     FRET0,FRET1,FRET2,FRET3,FRET4,FRET5,FRET6,
@@ -95,6 +110,10 @@ unsigned char  E_notaVieja[N_STR] = {0,0,0}; // Almacena el valor antiguo de la 
 
 unsigned char fretTouched[N_STR] = {0,0,0};
 
+unsigned char led_STR[] = {LED_EL,LED_A,LED_D, // Pines de salida para los leds que indican
+                          LED_G,LED_B,LED_EH}; // que cuerdas estan activas
+unsigned char  cuerdas=EAD;    // cuerda en la que se encuentra, por defecto EAD
+
 bool ligado=true;   // Cambia de modo ligado de notas a modo no ligado
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
                     // ya sea por la fuerza del sensor o mediante un pot
@@ -106,7 +125,11 @@ void setup()
 
   pinMode(SW_LIGADO, INPUT);
   pinMode(SW_VEL, INPUT);
-  
+  pinMode(POT_STR,INPUT);
+    
+  for(int i=0; i< 6; i++)
+    pinMode(led_STR[i],OUTPUT);
+
   for(int i=0; i<N_STR; i++)
   {
     pinMode(T_pins[i], INPUT);
@@ -123,7 +146,7 @@ void loop() {
     ligadoNotas();
   rutinaEnvio();
   cortarNota();
-  delay(5);
+  delay(10);
 }
 
 void imprimir()
@@ -153,8 +176,9 @@ void imprimir()
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
-  ligado         = digitalRead(SW_LIGADO);
-  vel_Midi       = digitalRead(SW_VEL);
+  ligado   = digitalRead(SW_LIGADO);
+  vel_Midi = digitalRead(SW_VEL);
+  cuerdas  = estadoCuerdas();
   for (int i=0; i<N_STR; i++)
   {
     T_activeNew[i] = comprobarPulsado(i,vel_Midi);
@@ -217,6 +241,70 @@ unsigned short valorCuerda(int i)
 
 /*****************************************************************************/
 /*!
+    \fn             unsigned char estadoCuerdas()
+    \param [in]     none
+    \return         char pos : configuracion de las cuerdas deseadas
+    \descripcion:   Lee el valor del potenciometro el cual se encarga de cargar
+                    una configuracion de cuerdas u otra
+
+    \autor          David Garcia Diez
+******************************************************************************/
+unsigned char estadoCuerdas()
+{
+  unsigned short potCuerda=0; 
+  unsigned char  pos=0;
+  potCuerda = analogRead(POT_STR);
+  pos = map (potCuerda, 0, 1023, 0, 3);
+  switch (pos)
+  {
+    case EAD:
+      digitalWrite(led_STR[0], HIGH);
+      digitalWrite(led_STR[1], HIGH);
+      digitalWrite(led_STR[2], HIGH);
+      digitalWrite(led_STR[3], LOW);
+      digitalWrite(led_STR[4], LOW);
+      digitalWrite(led_STR[5], LOW);
+
+    break;
+    case ADG:
+      digitalWrite(led_STR[0], LOW);
+      digitalWrite(led_STR[1], HIGH);
+      digitalWrite(led_STR[2], HIGH);
+      digitalWrite(led_STR[3], HIGH);
+      digitalWrite(led_STR[4], LOW);
+      digitalWrite(led_STR[5], LOW);
+    break;
+    case DGB:
+      digitalWrite(led_STR[0], LOW);
+      digitalWrite(led_STR[1], LOW);
+      digitalWrite(led_STR[2], HIGH);
+      digitalWrite(led_STR[3], HIGH);
+      digitalWrite(led_STR[4], HIGH);
+      digitalWrite(led_STR[5], LOW);
+    break;
+    case GBE:
+      digitalWrite(led_STR[0], LOW);
+      digitalWrite(led_STR[1], LOW);
+      digitalWrite(led_STR[2], LOW);
+      digitalWrite(led_STR[3], HIGH);
+      digitalWrite(led_STR[4], HIGH);
+      digitalWrite(led_STR[5], HIGH);
+    break;
+    default:
+      digitalWrite(led_STR[0], LOW);
+      digitalWrite(led_STR[1], LOW);
+      digitalWrite(led_STR[2], LOW);
+      digitalWrite(led_STR[3], LOW);
+      digitalWrite(led_STR[4], LOW);
+      digitalWrite(led_STR[5], LOW);
+    break;
+  }
+  return pos;
+}
+
+
+/*****************************************************************************/
+/*!
     \fn             void determinaTraste()
     \param [in]     none
     \return         none
@@ -270,10 +358,7 @@ void ligadoNotas(){
   for(int i=0; i<N_STR; i++){
     if(E_notaNueva[i])
     {
-      nota = notas_default[i] + fretTouched[i];
-      /* hay dos formas de ver este ligado, si hay un || se puede generar
-         la nota con que solo se active una vez el touch y si tenemos un 
-         && hay que mantener pulsado */
+      nota = determinaNota(i);
       if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
       {
         noteOn(nota, T_value[i]);
@@ -304,7 +389,7 @@ void rutinaEnvio()
     //(T_activeNew[i]!=T_activeOld[i]) && 
     if(T_activeNew[i])
     {
-      E_notaNueva[i] = notas_default[i] + fretTouched[i];
+      E_notaNueva[i] = determinaNota(i);
       if(E_notaNueva[i] != E_notaVieja[i])
       { 
         noteOn(E_notaNueva[i], T_value[i]);
@@ -315,6 +400,37 @@ void rutinaEnvio()
     else
       E_notaVieja[i]=0;
   }
+}
+
+/*****************************************************************************/
+/*!
+    \fn             unsigned char determinaNota(int i)
+    \param [in]     int i: inidice sobre la nota que se desea seleccionar
+    \return         none
+    \descripcion:   modulo que determina en funcion del potenciometro de
+                    seleccion de cuerdas, que nota se envia
+
+    \autor          David Garcia Diez
+******************************************************************************/
+unsigned char determinaNota(int i)
+{
+  unsigned char nota=0;
+  switch (cuerdas)
+  {
+    case EAD:
+      nota = notas_default[i] + fretTouched[i];
+    break;
+    case ADG:
+      nota = notas_1_down[i] + fretTouched[i];
+    break;
+    case DGB:
+      nota = notas_2_down[i] + fretTouched[i];
+    break;
+    case GBE:
+      nota = notas_3_down[i] + fretTouched[i];
+    break;
+  }
+  return nota;
 }
 
 /*****************************************************************************/
@@ -370,5 +486,4 @@ void noteOff(int pitch)
   Serial.write(byte(pitch));
   Serial.write(byte(0));
 }
-
 
