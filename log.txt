@@ -3,3 +3,9 @@ v1.0 Codigo
 		la activación..
 		Hay una opción dentro de la funcion ligado para el control	
 		del ligado de las notas && o ||, estudiar para mejora.
+
+
+v2.0 Codigo 07/11/2017
+		Incluidos los modulos de:
+		- Ligado nota/ no ligado   --> Switch en pin digital X
+		- Velocidad midi pot / FSR --> Switch en pin digital X

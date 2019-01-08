@@ -25,6 +25,10 @@
 #define T1        A4
 #define T2        A5
 
+#define SW_LIGADO 2
+#define SW_VEL    3
+
+
 #define N_STR     3
 #define N_FRET    13
 #define N_KEYS    13
@@ -90,13 +94,19 @@ unsigned char  E_notaNueva[N_STR] = {0,0,0}; // Almacena el valor nuevo de la no
 unsigned char  E_notaVieja[N_STR] = {0,0,0}; // Almacena el valor antiguo de la nota de cada cuerda
 
 unsigned char fretTouched[N_STR] = {0,0,0};
-bool primera=true;
+
+bool ligado=true;   // Cambia de modo ligado de notas a modo no ligado
+bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
+                    // ya sea por la fuerza del sensor o mediante un pot
 
 void setup() 
 {
 
   Serial.begin(115200);
 
+  pinMode(SW_LIGADO, INPUT);
+  pinMode(SW_VEL, INPUT);
+  
   for(int i=0; i<N_STR; i++)
   {
     pinMode(T_pins[i], INPUT);
@@ -109,7 +119,8 @@ void loop() {
   readControls();
   determinaTraste();
   //imprimir();
-  ligadoNotas();
+  if(ligado) 
+    ligadoNotas();
   rutinaEnvio();
   cortarNota();
   delay(5);
@@ -124,8 +135,9 @@ void imprimir()
    /* output each array element's value */
 
      
-     // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
+     // 
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
+  // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
      // Serial.println("NOTA "+String(i)+" = "+String(S_active[i]));
      // Serial.println("\n"); 
 }
@@ -141,12 +153,14 @@ void imprimir()
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
+  ligado         = digitalRead(SW_LIGADO);
+  vel_Midi       = digitalRead(SW_VEL);
   for (int i=0; i<N_STR; i++)
   {
-    T_activeOld[i] = T_activeNew[i];
-    T_activeNew[i] = comprobarPulsado(i);
+    T_activeNew[i] = comprobarPulsado(i,vel_Midi);
     S_vals[i]      = valorCuerda(i);
   }
+  
 }
 
 
@@ -159,11 +173,21 @@ void readControls(){
 
     \autor          David Garcia Diez
 ******************************************************************************/
-bool comprobarPulsado(int i)
+bool comprobarPulsado(int i, bool velMidi)
 {
   bool  activo=false;
+  //short potVel=0;
   short valorFSR = analogRead(T_pins[i]);
-  T_value[i] = map (valorFSR, 0, 980, 60, 127);//mapeo los valores
+  if(velMidi)
+    T_value[i] = map (valorFSR, 0, 980, 60, 127);//mapeo los valores leido por el FSR
+  else
+  {
+    // Aqui se simula la lectura del potenciometro
+    //short potVel = analogRead(PIN ANALOGICO POT VELOCIDAD); // Por ahora enviamos un 127
+    //T_value[i] = map (potVel, 0, 980, 60, 127);//mapeo los valores leido por el FSR
+    T_value[i]=127;
+  }
+
   if((valorFSR>15) && (valorFSR<950))
     activo=true;
 
@@ -252,13 +276,15 @@ void ligadoNotas(){
          && hay que mantener pulsado */
       if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
       {
-        noteOn(nota, 100);
+        noteOn(nota, T_value[i]);
+        //noteOn(nota, 127);
         noteOff(E_notaNueva[i]);
         E_notaNueva[i] = nota;
       }
     }
   }
 }
+
 
 /*****************************************************************************/
 /*!
@@ -281,8 +307,8 @@ void rutinaEnvio()
       E_notaNueva[i] = notas_default[i] + fretTouched[i];
       if(E_notaNueva[i] != E_notaVieja[i])
       { 
-        //noteOn(E_notaNueva[i], T_value[i]);
-        noteOn(E_notaNueva[i], 127);
+        noteOn(E_notaNueva[i], T_value[i]);
+        //noteOn(E_notaNueva[i], 127);
         E_notaVieja[i] = E_notaNueva[i]; 
       }   
     }
@@ -291,7 +317,15 @@ void rutinaEnvio()
   }
 }
 
+/*****************************************************************************/
+/*!
+    \fn             cortarNota()
+    \param [in]     none
+    \return         none
+    \descripcion:   modulo que se encarga de enviar una nota con velocidad 0
 
+    \autor          David Garcia Diez
+******************************************************************************/
 void cortarNota(){
   for (int i=0; i<N_STR; i++){
     if(E_notaNueva[i] && !fretTouched[i] && !T_activeNew[i]){
