@@ -15,30 +15,32 @@
 /*****************************************************************************/
 /*                               DEFINES                                     */
 /*****************************************************************************/
-#define S0        A10
-#define S1        A9
-#define S2        A8
+#define S0        A15
+#define S1        A14
+#define S2        A13
 
-#define T0        A11
-#define T1        A12
-#define T2        A13
+#define T0        A10
+#define T1        A11
+#define T2        A12
 
-#define POT_STR   A6
-#define LED_EL    53 
-#define LED_A     51
-#define LED_D     49
-#define LED_G     47
-#define LED_B     45
-#define LED_EH    43
+#define POT_STR   A1
+#define POT_VEL   A2
+#define POT_WAH   A6
+#define LED_EL    50 
+#define LED_A     48
+#define LED_D     46
+#define LED_G     44
+#define LED_B     42
+#define LED_EH    40
 
-#define GUIT_R    2
+#define GUIT_R    4
 #define GUIT_V    3
-#define GUIT_A    4
+#define GUIT_A    2
 
-#define SW_LIGADO     37
-#define SW_VEL        35
-#define SW_TRASTE     33
-#define SW_BASS_GUIT  31
+#define SW_LIGADO     32
+#define SW_VEL        30
+#define SW_FRETLESS   28
+#define SW_BASS_GUIT  26
 
 #define N_STR     3
 #define N_FRET    13
@@ -50,20 +52,34 @@
 #define GBE       3
 
 #define FRET0     0
-#define FRET1     830
-#define FRET2     700
-#define FRET3     595
-#define FRET4     510
-#define FRET5     447
-#define FRET6     380
-#define FRET7     330
-#define FRET8     280
-#define FRET9     232
-#define FRET10    184
-#define FRET11    136
-#define FRET12    85
-#define FRET13    10
+#define O_FRET1   550
+#define O_FRET2   390
+#define O_FRET3   298
+#define O_FRET4   238
+#define O_FRET5   200
+#define O_FRET6   167
+#define O_FRET7   145
+#define O_FRET8   125
+#define O_FRET9   107
+#define O_FRET10  90
+#define O_FRET11  72
+#define O_FRET12  50
+#define O_FRET13  7
 #define FRETFN    5
+
+#define N_FRET1   830
+#define N_FRET2   700
+#define N_FRET3   595
+#define N_FRET4   510
+#define N_FRET5   447
+#define N_FRET6   380
+#define N_FRET7   330
+#define N_FRET8   280
+#define N_FRET9   232
+#define N_FRET10  184
+#define N_FRET11  136
+#define N_FRET12  85
+#define N_FRET13  10
 
 #define NOTA_E_LOW  40
 #define NOTA_A      45
@@ -107,9 +123,14 @@ unsigned char bass_default[N_STR] = {BASS_E, BASS_A, BASS_D};
 unsigned char bass_1_down[N_STR]  = {BASS_A, BASS_D, BASS_G};
 
 
-unsigned short valorString[N_FRET+2] = {
-    FRET0,FRET1,FRET2,FRET3,FRET4,FRET5,FRET6,
-    FRET7,FRET8,FRET9,FRET10,FRET11,FRET12,FRET13,FRETFN};  // Valor de las cuerdas leidas  
+unsigned short n_valorString[N_FRET+2] = {
+    FRET0,N_FRET1,N_FRET2,N_FRET3,N_FRET4,N_FRET5,N_FRET6,N_FRET7,
+    N_FRET8,N_FRET9,N_FRET10,N_FRET11,N_FRET12,N_FRET13,FRETFN};  // Valor de las cuerdas leidas  
+
+unsigned short O_valorString[N_FRET+2] = {
+    FRET0,O_FRET1,O_FRET2,O_FRET3,O_FRET4,O_FRET5,O_FRET6,O_FRET7,
+    O_FRET8,O_FRET9,O_FRET10,O_FRET11,O_FRET12,O_FRET13,FRETFN};  // Valor de las cuerdas leidas  
+
 
 bool            T_activeOld[] = {false, false, false}; // Variable que indica si esta activo cada sensor
 bool            T_activeNew[] = {false, false, false}; // Variable que indica si esta activo cada sensor
@@ -131,7 +152,7 @@ unsigned char guit_onof[] = {GUIT_R,GUIT_V,GUIT_A}; // Activada el modo guitarra
 unsigned char  cuerdas=EAD;    // cuerda en la que se encuentra, por defecto EAD
 
 bool bass_guit=true;   // Cambia de modo de guitarra a bajo
-bool fretless=true;     // Cambia de modo de funcionamiento de fret o fretless
+bool trastes=true;     // Cambia de modo de funcionamiento de fret o fretless
 bool ligado=true;    // Cambia de modo ligado de notas a modo no ligado
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
                    // ya sea por la fuerza del sensor o mediante un pot
@@ -144,8 +165,9 @@ void setup()
   pinMode(SW_LIGADO, INPUT);
   pinMode(SW_BASS_GUIT, INPUT);
   pinMode(SW_VEL, INPUT);
-  pinMode(SW_TRASTE, INPUT);
+  pinMode(SW_FRETLESS, INPUT);
   pinMode(POT_STR,INPUT);
+  pinMode(POT_VEL,INPUT);
     
   for(int i=0; i< 6; i++)
     pinMode(led_GUIT[i],OUTPUT);
@@ -164,33 +186,34 @@ void loop() {
 
   readControls();
   determinaTraste();
- // imprimir();
+  //imprimir();
   if(ligado) 
     ligadoNotas();
   rutinaEnvio();
   cortarNota();
-  delay(10);
+  delay(20);
 }
 
 void imprimir()
 {
+
     for (int i=0; i<N_STR; i++)
   {
-    Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
+    Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
+    //Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   }
-   /* output each array element's value */
 
-     
-     // 
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
      // Serial.println("NOTA "+String(i)+" = "+String(S_active[i]));
   //Serial.println("NOTA1 "+String(ligado1));
      // Serial.println("\n"); 
-    Serial.println("LIGADO "+String(ligado));
+    /*Serial.println("LIGADO "+String(ligado));
   Serial.println("vel_Midi "+String(vel_Midi));
-  Serial.println("fretless "+String(fretless));
+  Serial.println("trastes "+String(trastes));
   Serial.println("bass_guit "+String(bass_guit));
+    Serial.println("POSICION "+String(pos));
+    Serial.println("VELOCIDAD "+String(posVel));*/
   Serial.println("\n"); 
 }
 
@@ -207,9 +230,8 @@ void imprimir()
 void readControls(){
   ligado      = digitalRead(SW_LIGADO);
   vel_Midi    = digitalRead(SW_VEL);
-  fretless    = digitalRead(SW_TRASTE);
+  trastes    = digitalRead(SW_FRETLESS);
   bass_guit   = digitalRead(SW_BASS_GUIT);
-  ligado      = digitalRead(SW_LIGADO);
 
   cuerdas     = estadoCuerdas();
   for (int i=0; i<N_STR; i++)
@@ -217,7 +239,6 @@ void readControls(){
     T_activeNew[i] = comprobarPulsado(i,vel_Midi);
     S_vals[i]      = valorCuerda(i);
   }
-  
 }
 
 
@@ -233,22 +254,21 @@ void readControls(){
 bool comprobarPulsado(int i, bool velMidi)
 {
   bool  activo=false;
-  //short potVel=0;
+  unsigned short potVel=0; 
   short valorFSR = analogRead(T_pins[i]);
-  if(velMidi)
-    T_value[i] = map (valorFSR, 0, 980, 60, 127);//mapeo los valores leido por el FSR
-  else
+    
+  if(!velMidi)
   {
-    // Aqui se simula la lectura del potenciometro
-    //short potVel = analogRead(PIN ANALOGICO POT VELOCIDAD); // Por ahora enviamos un 127
-    //T_value[i] = map (potVel, 0, 980, 60, 127);//mapeo los valores leido por el FSR
-    T_value[i]=127;
-  }
+    potVel = analogRead(POT_VEL);
+    T_value[i] = map (potVel, 0, 1023, 60, 127);
+  }    
+  else
+    T_value[i]=127;  
 
-  if((valorFSR>15) && (valorFSR<950) || !fretless)
+  if((valorFSR>9) && (valorFSR<1020) || !trastes)
     activo=true;
 
-  return activo;
+ return activo;
 }
 
 /*****************************************************************************/
@@ -288,49 +308,80 @@ unsigned char estadoCuerdas()
   unsigned char  pos=0;
   potCuerda = analogRead(POT_STR);
   pos = map (potCuerda, 0, 1023, 0, 3);
-  // HAY QUE INCLUIR LA SECUENCIA PARA EL BAJO
-  // Y TENER EL RGB PARA BAJO, GUITARRA Y FRETLESS
-  if(fretless)
+
+  if(trastes)
   {
-    analogWrite(guit_onof[0], 255);  // Color VERDE
-    analogWrite(guit_onof[1], 0);  
-    analogWrite(guit_onof[2], 255);  
-
-    switch (pos)
+    if(bass_guit)
     {
-      case EAD:
-        digitalWrite(led_GUIT[0], HIGH);
-        digitalWrite(led_GUIT[1], HIGH);
-        digitalWrite(led_GUIT[2], HIGH);
-        digitalWrite(led_GUIT[3], LOW);
-        digitalWrite(led_GUIT[4], LOW);
-        digitalWrite(led_GUIT[5], LOW);
+      analogWrite(guit_onof[0], 255);  // Color VERDE GUITAR MODE
+      analogWrite(guit_onof[1], 0);  // este tiene que estar abajo
+      analogWrite(guit_onof[2], 255); 
 
-      break;
-      case ADG:
-        digitalWrite(led_GUIT[0], LOW);
-        digitalWrite(led_GUIT[1], HIGH);
-        digitalWrite(led_GUIT[2], HIGH);
-        digitalWrite(led_GUIT[3], HIGH);
-        digitalWrite(led_GUIT[4], LOW);
-        digitalWrite(led_GUIT[5], LOW);
-      break;
-      case DGB:
-        digitalWrite(led_GUIT[0], LOW);
-        digitalWrite(led_GUIT[1], LOW);
-        digitalWrite(led_GUIT[2], HIGH);
-        digitalWrite(led_GUIT[3], HIGH);
-        digitalWrite(led_GUIT[4], HIGH);
-        digitalWrite(led_GUIT[5], LOW);
-      break;
-      case GBE:
-        digitalWrite(led_GUIT[0], LOW);
-        digitalWrite(led_GUIT[1], LOW);
-        digitalWrite(led_GUIT[2], LOW);
-        digitalWrite(led_GUIT[3], HIGH);
-        digitalWrite(led_GUIT[4], HIGH);
-        digitalWrite(led_GUIT[5], HIGH);
-      break;
+      switch (pos)
+      {
+        case EAD:
+          digitalWrite(led_GUIT[0], HIGH);
+          digitalWrite(led_GUIT[1], HIGH);
+          digitalWrite(led_GUIT[2], HIGH);
+          digitalWrite(led_GUIT[3], LOW);
+          digitalWrite(led_GUIT[4], LOW);
+          digitalWrite(led_GUIT[5], LOW);
+
+        break;
+        case ADG:
+          digitalWrite(led_GUIT[0], LOW);
+          digitalWrite(led_GUIT[1], HIGH);
+          digitalWrite(led_GUIT[2], HIGH);
+          digitalWrite(led_GUIT[3], HIGH);
+          digitalWrite(led_GUIT[4], LOW);
+          digitalWrite(led_GUIT[5], LOW);
+        break;
+        case DGB:
+          digitalWrite(led_GUIT[0], LOW);
+          digitalWrite(led_GUIT[1], LOW);
+          digitalWrite(led_GUIT[2], HIGH);
+          digitalWrite(led_GUIT[3], HIGH);
+          digitalWrite(led_GUIT[4], HIGH);
+          digitalWrite(led_GUIT[5], LOW);
+        break;
+        case GBE:
+          digitalWrite(led_GUIT[0], LOW);
+          digitalWrite(led_GUIT[1], LOW);
+          digitalWrite(led_GUIT[2], LOW);
+          digitalWrite(led_GUIT[3], HIGH);
+          digitalWrite(led_GUIT[4], HIGH);
+          digitalWrite(led_GUIT[5], HIGH);
+        break;
+      }
+    }
+    else
+    {
+      analogWrite(guit_onof[0], 0);  // Color AMARILLO BASS MODE
+      analogWrite(guit_onof[1], 0);  
+      analogWrite(guit_onof[2], 255);  
+
+      switch (pos)
+      {
+        case EAD:
+          digitalWrite(led_GUIT[0], HIGH);
+          digitalWrite(led_GUIT[1], HIGH);
+          digitalWrite(led_GUIT[2], HIGH);
+          digitalWrite(led_GUIT[3], LOW);
+          digitalWrite(led_GUIT[4], LOW);
+          digitalWrite(led_GUIT[5], LOW);
+
+        break;
+        case ADG:
+        case DGB:
+        case GBE:
+          digitalWrite(led_GUIT[0], LOW);
+          digitalWrite(led_GUIT[1], HIGH);
+          digitalWrite(led_GUIT[2], HIGH);
+          digitalWrite(led_GUIT[3], HIGH);
+          digitalWrite(led_GUIT[4], LOW);
+          digitalWrite(led_GUIT[5], LOW);
+        break;
+      }
     }
   }
   else
@@ -369,23 +420,48 @@ void determinaTraste()
   for(int i=0; i< N_STR; i++)
   {
     s_val = S_vals[i];
+    if(i==2)
+    {
+      if(s_val==FRET0)
+      {
+        fretTouched[i]=0;
+      }
+      else if (s_val>= O_FRET1)
+      {
+        fretTouched[i] = 1;
+      }
+      else
+      {
+        for (int j=1; j<=N_FRET; j++) 
+        {
+          if((s_val<O_valorString[j-1]) && (s_val>=O_valorString[j]))
+          {
+            fretTouched[i] = j;
+            break;
+          }
+        }
+      }
+    }
 
-    if(s_val==FRET0)
-    {
-      fretTouched[i]=0;
-    }
-    else if (s_val>= FRET1)
-    {
-      fretTouched[i] = 1;
-    }
     else
     {
-      for (int j=1; j<=N_FRET; j++) 
+      if(s_val==FRET0)
       {
-        if((s_val<valorString[j-1]) && (s_val>=valorString[j]))
+        fretTouched[i]=0;
+      }
+      else if (s_val>= N_FRET1)
+      {
+        fretTouched[i] = 1;
+      }
+      else
+      {
+        for (int j=1; j<=N_FRET; j++) 
         {
-          fretTouched[i] = j;
-          break;
+          if((s_val<n_valorString[j-1]) && (s_val>=n_valorString[j]))
+          {
+            fretTouched[i] = j;
+            break;
+          }
         }
       }
     }
@@ -408,12 +484,18 @@ void ligadoNotas(){
     if(E_notaNueva[i])
     {
       nota = determinaNota(i);
-      if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
+      if(!(fretTouched[0]>0 && T_activeNew[1] && 
+        (nota==NOTA_A || nota==NOTA_D ||
+         nota==NOTA_G || nota==NOTA_B ||
+         nota==BASS_A || nota==BASS_D)))
       {
-        noteOn(nota, T_value[i]);
-        //noteOn(nota, 127);
-        noteOff(E_notaNueva[i]);
-        E_notaNueva[i] = nota;
+        if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
+        {
+          noteOn(nota, T_value[i]);
+          //noteOn(nota, 127);
+          noteOff(E_notaNueva[i]);
+          E_notaNueva[i] = nota;
+        }
       }
     }
   }
@@ -432,18 +514,22 @@ void ligadoNotas(){
 ******************************************************************************/
 void rutinaEnvio()
 {
-  //TENGO QUE METER LA MEJORA DE PODER MEDIR LA INTENSIDAD DEL FSR
   for (int i=0; i<N_STR; i++)
   {
     //(T_activeNew[i]!=T_activeOld[i]) && 
     if(T_activeNew[i])
     {
       E_notaNueva[i] = determinaNota(i);
-      if(E_notaNueva[i] != E_notaVieja[i])
-      { 
-        noteOn(E_notaNueva[i], T_value[i]);
-        //noteOn(E_notaNueva[i], 127);
-        E_notaVieja[i] = E_notaNueva[i]; 
+      if(!(fretTouched[0]>0 && T_activeNew[1] && 
+        (E_notaNueva[1]==NOTA_A || E_notaNueva[1]==NOTA_D ||
+         E_notaNueva[1]==NOTA_G || E_notaNueva[1]==NOTA_B ||
+         E_notaNueva[1]==BASS_A || E_notaNueva[1]==BASS_D)))
+      {
+        if(E_notaNueva[i] != E_notaVieja[i])
+        { 
+          noteOn(E_notaNueva[i], T_value[i]);
+          E_notaVieja[i] = E_notaNueva[i]; 
+        }
       }   
     }
     else
@@ -464,12 +550,14 @@ void rutinaEnvio()
 unsigned char determinaNota(int i)
 {
   unsigned char nota=0;
-  if(fretless)
+
+  if(trastes)
   {
     if(bass_guit)
     {
       switch (cuerdas)
       {
+
         case EAD:
           nota = guit_default[i] + fretTouched[i];
         break;
