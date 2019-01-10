@@ -197,10 +197,10 @@ void loop() {
 void imprimir()
 {
 
-    for (int i=0; i<N_STR; i++)
+  for (int i=0; i<N_STR; i++)
   {
     Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
-    //Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
+    Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   }
 
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
@@ -230,7 +230,7 @@ void imprimir()
 void readControls(){
   ligado      = digitalRead(SW_LIGADO);
   vel_Midi    = digitalRead(SW_VEL);
-  trastes    = digitalRead(SW_FRETLESS);
+  trastes     = digitalRead(SW_FRETLESS);
   bass_guit   = digitalRead(SW_BASS_GUIT);
 
   cuerdas     = estadoCuerdas();
@@ -265,7 +265,7 @@ bool comprobarPulsado(int i, bool velMidi)
   else
     T_value[i]=127;  
 
-  if((valorFSR>9) && (valorFSR<1020) || !trastes)
+  if((valorFSR>70) && (valorFSR<1020) || !trastes)
     activo=true;
 
  return activo;
@@ -484,11 +484,6 @@ void ligadoNotas(){
     if(E_notaNueva[i])
     {
       nota = determinaNota(i);
-      if(!(fretTouched[0]>0 && T_activeNew[1] && 
-        (nota==NOTA_A || nota==NOTA_D ||
-         nota==NOTA_G || nota==NOTA_B ||
-         nota==BASS_A || nota==BASS_D)))
-      {
         if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
         {
           noteOn(nota, T_value[i]);
@@ -496,7 +491,6 @@ void ligadoNotas(){
           noteOff(E_notaNueva[i]);
           E_notaNueva[i] = nota;
         }
-      }
     }
   }
 }
@@ -516,21 +510,16 @@ void rutinaEnvio()
 {
   for (int i=0; i<N_STR; i++)
   {
-    //(T_activeNew[i]!=T_activeOld[i]) && 
     if(T_activeNew[i])
     {
       E_notaNueva[i] = determinaNota(i);
-      if(!(fretTouched[0]>0 && T_activeNew[1] && 
-        (E_notaNueva[1]==NOTA_A || E_notaNueva[1]==NOTA_D ||
-         E_notaNueva[1]==NOTA_G || E_notaNueva[1]==NOTA_B ||
-         E_notaNueva[1]==BASS_A || E_notaNueva[1]==BASS_D)))
-      {
         if(E_notaNueva[i] != E_notaVieja[i])
         { 
+          
           noteOn(E_notaNueva[i], T_value[i]);
           E_notaVieja[i] = E_notaNueva[i]; 
         }
-      }   
+         
     }
     else
       E_notaVieja[i]=0;
