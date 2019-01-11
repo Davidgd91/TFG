@@ -155,6 +155,7 @@ bool trastes=true;     // Cambia de modo de funcionamiento de fret o fretless
 bool wah_activo=true;    // Cambia cambia al modo activacion del Wah
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
                    // ya sea por la fuerza del sensor o mediante un pot
+bool wah_activoP=true;
 
 void setup() 
 {
@@ -167,6 +168,7 @@ void setup()
   pinMode(SW_FRETLESS, INPUT);
   pinMode(POT_STR,INPUT);
   pinMode(POT_VEL,INPUT);
+  pinMode(POT_WAH,INPUT);
     
   for(int i=0; i< 6; i++)
     pinMode(led_GUIT[i],OUTPUT);
@@ -186,6 +188,7 @@ void loop() {
   readControls();
   determinaTraste();
   //imprimir();
+  readWah();
   rutinaEnvio();
   cortarNota();
   delay(20);
@@ -194,11 +197,12 @@ void loop() {
 void imprimir()
 {
 
+/*
   for (int i=0; i<N_STR; i++)
   {
     Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
     Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
-  }
+  }*/
 
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
@@ -223,7 +227,7 @@ void imprimir()
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
-  wah_activo      = digitalRead(SW_ONOFFWAH);
+  wah_activo  = digitalRead(SW_ONOFFWAH);
   vel_Midi    = digitalRead(SW_VEL);
   trastes     = digitalRead(SW_FRETLESS);
   bass_guit   = digitalRead(SW_BASS_GUIT);
@@ -250,17 +254,18 @@ bool comprobarPulsado(int i, bool velMidi)
 {
   bool  activo=false;
   unsigned short potVel=0; 
-  short valorFSR = analogRead(T_pins[i]);
+  unsigned short valorFSR = analogRead(T_pins[i]);
     
-  if(!velMidi)
+  if (!velMidi)
   {
-    potVel = analogRead(POT_VEL);
+    potVel = mediaMedidas(POT_VEL);
     T_value[i] = map (potVel, 0, 1023, 60, 127);
-  }    
+  }
   else
-    T_value[i]=127;  
+    T_value[i] = 120;  
+  
 
-  if((valorFSR>70) && (valorFSR<1020) || !trastes)
+  if(((valorFSR>70) && (valorFSR<1020)) || !trastes)
     activo=true;
 
  return activo;
@@ -271,16 +276,58 @@ bool comprobarPulsado(int i, bool velMidi)
     \fn             unsigned short valorCuerda(int i)
     \param [in]     int int   : indice de la cuerda a leer
     \return         short media : valor leido en el pot despues de 10 lecturas
-    \descripcion:   Media de 10 lecturas de una cuerda
+    \descripcion:   Medida de una cuerda
 
     \autor          David Garcia Diez
 ******************************************************************************/
 unsigned short valorCuerda(int i)
 {
+  unsigned short medida=0;
+  medida = mediaMedidas(S_pins[i]);
+  return medida;
+}
+
+
+/*****************************************************************************/
+/*!
+    \fn             void readWah()
+    \param [in]     none
+    \return         none
+    \descripcion:   Medida de la palanca
+
+    \autor          David Garcia Diez
+******************************************************************************/
+void readWah()
+{
+  unsigned short medida=0;
+  unsigned short valor=0;
+  medida = mediaMedidas(POT_WAH);
+  valor = map (medida, 600, 1024 , 0, 127);
+  if(wah_activo)
+  {
+    if(valor>15)
+      controllerChange(valor);
+  }
+  if(!wah_activo && wah_activoP==1)
+    controllerChange(60);
+  wah_activoP=wah_activo;
+}
+
+/*****************************************************************************/
+/*!
+    \fn             unsigned short mediaMedidas(int puerto)
+    \param [in]     int : puerto analogico del que leer
+    \return         short media : valor leido despues de 10 lecturas
+    \descripcion:   Media de 10 medidas
+
+    \autor          David Garcia Diez
+******************************************************************************/
+unsigned short mediaMedidas(int puerto)
+{
   unsigned short media=0;
   for(int j=0;j<10;j++)
   {
-    media = media+analogRead(S_pins[i]);
+    media = media+analogRead(puerto);
   }
     media = media/10;
 
@@ -301,8 +348,9 @@ unsigned char estadoCuerdas()
 {
   unsigned short potCuerda=0; 
   unsigned char  pos=0;
-  potCuerda = analogRead(POT_STR);
-  pos = map (potCuerda, 0, 1023, 0, 3);
+
+  potCuerda = mediaMedidas(POT_STR);
+  pos = map (potCuerda, 0, 1018, 0, 3);
 
   if(trastes)
   {
@@ -410,7 +458,7 @@ unsigned char estadoCuerdas()
 ******************************************************************************/
 void determinaTraste() 
 {
-  short s_val = 0; 
+  unsigned short s_val = 0; 
   
   for(int i=0; i< N_STR; i++)
   {
@@ -483,7 +531,7 @@ void rutinaEnvio()
       E_notaNueva[i] = determinaNota(i);
         if(E_notaNueva[i] != E_notaVieja[i])
         { 
-          
+          noteOff(E_notaVieja[i]);
           noteOn(E_notaNueva[i], T_value[i]);
           E_notaVieja[i] = E_notaNueva[i]; 
         }
@@ -603,8 +651,15 @@ void noteOn(int pitch, int velocity)
 ******************************************************************************/
 void noteOff(int pitch) 
 {
-  Serial.write(byte(0x90));
+  Serial.write(byte(0x80));
   Serial.write(byte(pitch));
   Serial.write(byte(0));
 }
 
+//Sends controller change to the specified controller
+void controllerChange(int value) 
+{
+  Serial.write(byte(0xB1));
+  Serial.write(byte(5));
+  Serial.write(byte(value));
+}
