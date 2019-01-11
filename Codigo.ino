@@ -37,7 +37,7 @@
 #define GUIT_V    3
 #define GUIT_A    2
 
-#define SW_LIGADO     32
+#define SW_ONOFFWAH   32
 #define SW_VEL        30
 #define SW_FRETLESS   28
 #define SW_BASS_GUIT  26
@@ -85,8 +85,8 @@
 #define NOTA_A      45
 #define NOTA_D      50
 #define NOTA_G      55
-#define NOTA_B      60
-#define NOTA_E_HIGH 65
+#define NOTA_B      59
+#define NOTA_E_HIGH 64
 
 #define BASS_E 28
 #define BASS_A 33
@@ -101,7 +101,6 @@ void imprimir();
 void readControls();
 bool comprobarPulsado(int i);
 void determinaTraste ();
-void ligadoNotas();
 void rutinaEnvio();
 void noteOn(int pitch, int velocity);
 void noteOff(int pitch);
@@ -153,7 +152,7 @@ unsigned char  cuerdas=EAD;    // cuerda en la que se encuentra, por defecto EAD
 
 bool bass_guit=true;   // Cambia de modo de guitarra a bajo
 bool trastes=true;     // Cambia de modo de funcionamiento de fret o fretless
-bool ligado=true;    // Cambia de modo ligado de notas a modo no ligado
+bool wah_activo=true;    // Cambia cambia al modo activacion del Wah
 bool vel_Midi=true; // Cambia de modo de registrar la velocidad del midi
                    // ya sea por la fuerza del sensor o mediante un pot
 
@@ -162,7 +161,7 @@ void setup()
 
   Serial.begin(115200);
 
-  pinMode(SW_LIGADO, INPUT);
+  pinMode(SW_ONOFFWAH, INPUT);
   pinMode(SW_BASS_GUIT, INPUT);
   pinMode(SW_VEL, INPUT);
   pinMode(SW_FRETLESS, INPUT);
@@ -187,8 +186,6 @@ void loop() {
   readControls();
   determinaTraste();
   //imprimir();
-  if(ligado) 
-    ligadoNotas();
   rutinaEnvio();
   cortarNota();
   delay(20);
@@ -206,9 +203,7 @@ void imprimir()
      // Serial.println("TRASTE "+String(i)+" = "+String(fretTouched[i]));
   // Serial.println("CUERDA "+String(i)+" = "+String(S_vals[i]));
      // Serial.println("NOTA "+String(i)+" = "+String(S_active[i]));
-  //Serial.println("NOTA1 "+String(ligado1));
-     // Serial.println("\n"); 
-    /*Serial.println("LIGADO "+String(ligado));
+    /*
   Serial.println("vel_Midi "+String(vel_Midi));
   Serial.println("trastes "+String(trastes));
   Serial.println("bass_guit "+String(bass_guit));
@@ -228,7 +223,7 @@ void imprimir()
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
-  ligado      = digitalRead(SW_LIGADO);
+  wah_activo      = digitalRead(SW_ONOFFWAH);
   vel_Midi    = digitalRead(SW_VEL);
   trastes     = digitalRead(SW_FRETLESS);
   bass_guit   = digitalRead(SW_BASS_GUIT);
@@ -464,33 +459,6 @@ void determinaTraste()
           }
         }
       }
-    }
-  }
-}
-
-/*****************************************************************************/
-/*!
-    \fn             ligadoNotas()
-    \param [in]     none
-    \return         none
-    \descripcion:   modulo que comprueba que esta activado el FSR para hacer 
-                    la llamada a la funcion de enviar nota
-
-    \autor          David Garcia Diez
-******************************************************************************/
-void ligadoNotas(){
-  char nota = 0;
-  for(int i=0; i<N_STR; i++){
-    if(E_notaNueva[i])
-    {
-      nota = determinaNota(i);
-        if(nota != E_notaNueva[i] && (fretTouched[i] || T_activeNew[i]))
-        {
-          noteOn(nota, T_value[i]);
-          //noteOn(nota, 127);
-          noteOff(E_notaNueva[i]);
-          E_notaNueva[i] = nota;
-        }
     }
   }
 }
