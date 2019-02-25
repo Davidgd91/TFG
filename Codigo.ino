@@ -45,6 +45,11 @@
 #define N_STR     3
 #define N_FRET    13
 #define N_KEYS    13
+#define N_LEDS    6
+#define N_RGB     2
+
+#define VMAXMIDI  127
+#define MAXADC    1024
 
 #define EAD       0
 #define ADG       1
@@ -170,9 +175,9 @@ void setup()
   pinMode(POT_VEL,INPUT);
   pinMode(POT_WAH,INPUT);
     
-  for(int i=0; i< 6; i++)
+  for(int i=0; i< N_LEDS; i++)
     pinMode(led_GUIT[i],OUTPUT);
-  for(int i=0; i< 2; i++)
+  for(int i=0; i< N_RGB; i++)
     pinMode(guit_onof[i],OUTPUT);
   
 
@@ -223,7 +228,6 @@ void imprimir()
     \return         none
     \descripcion:   funcion que lee el valor de los sensores de entrada del 
                     dispositivo.
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void readControls(){
@@ -247,7 +251,6 @@ void readControls(){
     \param [in]     int int   : indice del FSR activado
     \return         short actuvo : valor del sensor activado
     \descripcion:   funcion para comprobar que se ha presioniado un FSR
-
     \autor          David Garcia Diez
 ******************************************************************************/
 bool comprobarPulsado(int i, bool velMidi)
@@ -259,13 +262,13 @@ bool comprobarPulsado(int i, bool velMidi)
   if (!velMidi)
   {
     potVel = mediaMedidas(POT_VEL);
-    T_value[i] = map (potVel, 0, 1023, 60, 127);
+    T_value[i] = map (potVel, 0, MAXADC, 60, VMAXMIDI);
   }
   else
     T_value[i] = 120;  
   
 
-  if(((valorFSR>70) && (valorFSR<1020)) || !trastes)
+  if(((valorFSR>70) && (valorFSR<MAXADC)) || !trastes)
     activo=true;
 
  return activo;
@@ -275,9 +278,8 @@ bool comprobarPulsado(int i, bool velMidi)
 /*!
     \fn             unsigned short valorCuerda(int i)
     \param [in]     int int   : indice de la cuerda a leer
-    \return         short media : valor leido en el pot despues de 10 lecturas
+    \return         short media : valor leido en el softpot
     \descripcion:   Medida de una cuerda
-
     \autor          David Garcia Diez
 ******************************************************************************/
 unsigned short valorCuerda(int i)
@@ -294,7 +296,6 @@ unsigned short valorCuerda(int i)
     \param [in]     none
     \return         none
     \descripcion:   Medida de la palanca
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void readWah()
@@ -302,7 +303,7 @@ void readWah()
   unsigned short medida=0;
   unsigned short valor=0;
   medida = mediaMedidas(POT_WAH);
-  valor = map (medida, 600, 1024 , 0, 127);
+  valor = map (medida, 600, MAXADC , 0, VMAXMIDI);
   if(wah_activo)
   {
     if(valor>15)
@@ -319,7 +320,6 @@ void readWah()
     \param [in]     int : puerto analogico del que leer
     \return         short media : valor leido despues de 10 lecturas
     \descripcion:   Media de 10 medidas
-
     \autor          David Garcia Diez
 ******************************************************************************/
 unsigned short mediaMedidas(int puerto)
@@ -340,8 +340,9 @@ unsigned short mediaMedidas(int puerto)
     \param [in]     none
     \return         char pos : configuracion de las cuerdas deseadas
     \descripcion:   Lee el valor del potenciometro el cual se encarga de cargar
-                    una configuracion de cuerdas u otra
-
+                    una configuracion de cuerdas u otra. Cambia la iluminacion
+                    de los leds azules en funcion de la distribucion de cuerdas
+                    e indica con el rgb el modo de uso.
     \autor          David Garcia Diez
 ******************************************************************************/
 unsigned char estadoCuerdas()
@@ -452,8 +453,7 @@ unsigned char estadoCuerdas()
     \param [in]     none
     \return         none
     \descripcion:   modulo para determinar el valor del traste correspondiente
-                    al que se lee de cada uno de los potenciometros.
-
+                    al que se lee de cada uno de los softpot.
     \autor          David Garcia Diez
 ******************************************************************************/
 void determinaTraste() 
@@ -519,7 +519,6 @@ void determinaTraste()
     \return         none
     \descripcion:   modulo que comprueba que esta activado el FSR para hacer 
                     la llamada a la funcion de enviar nota
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void rutinaEnvio()
@@ -549,7 +548,6 @@ void rutinaEnvio()
     \return         none
     \descripcion:   modulo que determina en funcion del potenciometro de
                     seleccion de cuerdas, que nota se envia
-
     \autor          David Garcia Diez
 ******************************************************************************/
 unsigned char determinaNota(int i)
@@ -608,7 +606,6 @@ unsigned char determinaNota(int i)
     \param [in]     none
     \return         none
     \descripcion:   modulo que se encarga de enviar una nota con velocidad 0
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void cortarNota(){
@@ -619,16 +616,16 @@ void cortarNota(){
     }
   }
 }
+
+
 /*****************************************************************************/
 /*!
-    \fn             void noteOn(int cmd, int pitch, int velocity)
-    \param [in]     int cmd:      valor 
+    \fn             void noteOn(int pitch, int velocity)
     \param [in]     int pitch:    valor de la nota midi equivalente
     \param [in]     int velocity: valor de la velocidad de la nota midi
     \return         none
     \descripcion:   funcion que envía por el canal serie la nota midi 
                     correspondiente a la nota tocada.
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void noteOn(int pitch, int velocity)
@@ -640,13 +637,11 @@ void noteOn(int pitch, int velocity)
 
 /*****************************************************************************/
 /*!
-    \fn             void noteOff(int cmd, int pitch)
-    \param [in]     int cmd: valor 
+    \fn             void noteOff(int pitch)
     \param [in]     int pitch: valor de la nota
     \return         none
     \descripcion:   funcion que envía por el canal serie el mandato de apagar
                     la nota, para ello envía la velocidad a 0.
-
     \autor          David Garcia Diez
 ******************************************************************************/
 void noteOff(int pitch) 
@@ -656,7 +651,15 @@ void noteOff(int pitch)
   Serial.write(byte(0));
 }
 
-//Sends controller change to the specified controller
+/*****************************************************************************/
+/*!
+    \fn             void noteOff(int value)
+    \param [in]     int value: valor de la palanca enviado al controlador midi
+    \return         none
+    \descripcion:   funcion que que envia por el canal serie el controlChange
+                    correspondiente asignado a la palanca del dispositivo.
+    \autor          David Garcia Diez
+******************************************************************************/
 void controllerChange(int value) 
 {
   Serial.write(byte(0xB1));
